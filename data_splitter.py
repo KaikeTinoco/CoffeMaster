@@ -40,13 +40,11 @@ metadatas = []
 
 for arquivo, nome in zip(arquivos, nomes):
     chunks = splitter.split_text(arquivo)
-    conteudos.extend(chunks)  # adiciona todos os chunks
-    metadatas.extend([{"source": nome}] * len(chunks))  # um metadata por chunk
+    conteudos.extend(chunks)  
+    metadatas.extend([{"source": nome}] * len(chunks))  
 
-# Agora criamos os documentos com o metadata certo
 documentos = splitter.create_documents(conteudos, metadatas=metadatas)
 
-# Salvando em arquivo
 with open("document_chunks_output.txt", "w", encoding="utf-8") as f:
     for i, doc in enumerate(documentos):
         f.write(f"--- Documento {i + 1} ---\n")
