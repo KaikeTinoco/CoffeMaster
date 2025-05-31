@@ -17,7 +17,6 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 bot = commands.Bot(command_prefix="!", intents=intents)
 discord_token = os.getenv("DISCORD_TOKEN")
 chat = client.chats.create(model="gemini-2.0-flash")
-openAiApiKey = "lm-studio"
 
 
 with open("CoffeMaster\data\instrucoes.md", "r", encoding="utf-8") as f:

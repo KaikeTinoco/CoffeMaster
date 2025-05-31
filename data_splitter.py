@@ -9,9 +9,12 @@ from langchain.vectorstores import FAISS
 import faiss
 import os
 import dotenv
+from google import genai
 
 dotenv.load_dotenv()
 
+GEMINI_API_KEY =  os.environ.get("GOOGLE_TOKEN")
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 
@@ -36,8 +39,8 @@ with open("CoffeMaster\data\LivroMestre3.md", "r", encoding="utf-8") as f:
 with open("CoffeMaster\data\LivroMestre4.md", "r", encoding="utf-8") as f:
     mestre4 = f.read()    
 
-arquivos = [livroJogador, monstros]
-nomes = ["LivroJogador.md", "Monstros.md"]  
+arquivos = [livroJogador, monstros, mestre1, mestre2, mestre3, mestre4]
+nomes = ["LivroJogador.md", "Monstros.md", "Mestre1.md", "Mestre2.md", "Mestre3.md", "Mestre4.md"]  
 splitter = RecursiveCharacterTextSplitter(
     chunk_size=1200,
     chunk_overlap=100,
@@ -71,7 +74,16 @@ def create_vectorsstore(chunks):
 vectorstore = FAISS.load_local("CoffeMaster/faiss_db", HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2"), allow_dangerous_deserialization=True)
 #Transforma a vector store em um retriver
 retriever = vectorstore.as_retriever(search_type="mmr", search_kwargs={"k": 7})
-resultado = retriever.invoke("O que acontece se eu conjurar magia duas vezes no mesmo turno?")
-print(resultado)
 
+prompt = "Vocé é um bot especialista em RPG que ajuda a responder perguntas sobre Dungeons and Dragons, com base nos dados recebidos e seus conhecimentos, responda a pergunta do usuário."
+def gerarResposta(pergunta):
+    respostaRetriever = retriever.invoke(pergunta)
+    resposta_texto = "\n\n".join([doc.page_content for doc in respostaRetriever])
+    reposta = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[prompt, resposta_texto, pergunta]
+    )
+    return reposta.text
 
+teste = gerarResposta("Se eu estiver em uma sala escura, sendo um dragonborn, posso usar minha habilidade de cuspir fogo para iluminar a sala?")
+print(teste)
