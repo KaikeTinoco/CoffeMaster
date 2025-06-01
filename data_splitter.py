@@ -75,15 +75,15 @@ vectorstore = FAISS.load_local("CoffeMaster/faiss_db", HuggingFaceEmbeddings(mod
 #Transforma a vector store em um retriver
 retriever = vectorstore.as_retriever(search_type="mmr", search_kwargs={"k": 7})
 
-prompt = "Vocé é um bot especialista em RPG que ajuda a responder perguntas sobre Dungeons and Dragons, com base nos dados recebidos e seus conhecimentos, responda a pergunta do usuário."
+prompt = '''Vocé é um bot especialista em RPG que ajuda a responder perguntas sobre Dungeons and Dragons, com base nos dados recebidos e seus conhecimentos, responda a pergunta do usuário. 
+Na sua resposta, inclua todos os dados e números que você receber'''
 def gerarResposta(pergunta):
     respostaRetriever = retriever.invoke(pergunta)
     resposta_texto = "\n\n".join([doc.page_content for doc in respostaRetriever])
-    reposta = client.models.generate_content(
+    resposta = client.models.generate_content(
         model="gemini-2.0-flash",
         contents=[prompt, resposta_texto, pergunta]
     )
-    return reposta.text
+    return resposta.text
 
-teste = gerarResposta("Se eu estiver em uma sala escura, sendo um dragonborn, posso usar minha habilidade de cuspir fogo para iluminar a sala?")
-print(teste)
+

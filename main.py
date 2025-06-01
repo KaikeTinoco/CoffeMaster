@@ -8,6 +8,8 @@ load_dotenv()
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from api_client import api_client
 import json
+import data_splitter
+import CoffeMaster.interpretador as interpretador
 
 intents = discord.Intents.default()
 intents.messages = True
@@ -22,30 +24,13 @@ chat = client.chats.create(model="gemini-2.0-flash")
 with open("CoffeMaster\data\instrucoes.md", "r", encoding="utf-8") as f:
     instrucoes = f.read()
 
-with open("CoffeMaster\data\LivroJogador.md", "r", encoding="utf-8") as f:
-    livroJogador = f.read()
-
-with open("CoffeMaster\data\Monstros_formatado.md", "r", encoding="utf-8") as f:
-    monstros = f.read()
-
-with open("CoffeMaster\data\LivroMestre.md", "r", encoding="utf-8") as f:
-    mestre1 = f.read()
-
-with open("CoffeMaster\data\LivroMestre2.md", "r", encoding="utf-8") as f:
-    mestre2 = f.read()
-
-with open("CoffeMaster\data\LivroMestre3.md", "r", encoding="utf-8") as f:
-    mestre3 = f.read()
-
-with open("CoffeMaster\data\LivroMestre4.md", "r", encoding="utf-8") as f:
-    mestre4 = f.read()    
 
 
 canalDaCampanhaAtiva = {}
 
 @bot.event
 async def on_ready():
-    print(f"✅ Bot conectado como {bot.user}")
+    print(f" Bot conectado como {bot.user}")
 
 @bot.command()
 async def ping(ctx):
@@ -74,35 +59,25 @@ async def iniciar(ctx, nomeCampanha):
         "nome": nomeCampanha,
         "historico": []
     }
-    documentos = [instrucoes, mestre1, mestre2, mestre3, mestre4, livroJogador, monstros]
-    await enviar_arquivos_com_delay(chat, documentos)
-    response = chat.send_message(campanha_str, f"os jogadores iniciaram a campanha {nomeCampanha}, retome ela a partir do ultimo ponto de partida ou caso ela esteja vazia, inicie a campanha")
-    await ctx.send(response.text)
-
-
-import asyncio
-
-async def enviar_arquivos_com_delay(chat, arquivos, delay=8):
-    """
-    Envia uma lista de arquivos (strings) para o chat Gemini com um delay entre cada envio.
-    
-    :param chat: instância do chat iniciada com google.generativeai.GenerativeModel(...)
-    :param arquivos: lista de strings ou conteúdo .md já carregado
-    :param delay: tempo em segundos entre cada envio (padrão: 8s)
-    """
-    for index, arquivo in enumerate(arquivos, 1):
-        try:
-            print(f"Enviando arquivo {index}/{len(arquivos)}...")
-            await chat.send_message(arquivo)
-            await asyncio.sleep(delay)
-        except Exception as e:
-            print(f"Erro ao enviar o arquivo {index}: {e}")
+    prompt=f'''os jogadores iniciaram a campanha {nomeCampanha}, retome ela a partir do ultimo ponto de partida ou caso ela esteja vazia, inicie a campanha
+    para identificar se a campanha está vazia, veja se o campo contextoNarrativoAtual, nos dados que você recebeu, está vazio. Se sim, a campanha ainda não iniciou. Se já estiver algo dentro
+    do campo, a campanha já inicou. Com base nisso, seja bem descritivo e criativo para as duas situações, forneça uma introdução muito bem descritiva e interessante, ou uma continuação coerente
+    com o que já aconteceu'''
+    prompt_content = [instrucoes,
+                      campanha_str, 
+                      prompt]
+    response = chat.send_message(prompt_content)
+    for part in split_message(response.text):
+        await ctx.send(part)
 
 
 
 @bot.event
-async def onMessage(message):
+async def on_message(message):
     if message.author.bot:
+        return
+    if message.content.startswith('!'):
+        await bot.process_commands(message)
         return
     
     canal = message.channel.id
@@ -111,10 +86,10 @@ async def onMessage(message):
         historico = canalDaCampanhaAtiva[canal]["historico"]
         historico.append({"usuario": message.author.name, "mensagem": message.content})
 
+    response = gerarResposta(message.content)
 
-    response = chat.send_message(f"o jogador {message.author.name} disse: {message.content}")
     
-    for part in split_message(response.text):
+    for part in split_message(response):
         await message.channel.send(part)
 
     await bot.process_commands(message)
@@ -128,6 +103,15 @@ async def encerrar(ctx):
         await ctx.send("⛔ Campanha encerrada.")
     else:
         await ctx.send("❌ Nenhuma campanha ativa neste canal.")
+
+
+
+def gerarResposta(acao):
+    pergunta = interpretador.fazer_pergunta(acao)
+    resposta = data_splitter.gerarResposta(pergunta)
+    conteudos = [resposta, acao]
+    respostaFinal = chat.send_message(conteudos)
+    return respostaFinal.text
 
 
 
