@@ -10,6 +10,7 @@ from api_client import api_client
 import json
 import data_splitter
 import CoffeMaster.interpretador as interpretador
+from Bot_Gerador_de_Personagens import app as geradorPersonagem
 
 intents = discord.Intents.default()
 intents.messages = True
@@ -18,7 +19,6 @@ GEMINI_API_KEY =  os.environ.get("GOOGLE_TOKEN")
 client = genai.Client(api_key=GEMINI_API_KEY)
 bot = commands.Bot(command_prefix="!", intents=intents)
 discord_token = os.getenv("DISCORD_TOKEN")
-chat = client.chats.create(model="gemini-2.0-flash")
 
 
 with open("CoffeMaster\data\instrucoes.md", "r", encoding="utf-8") as f:
@@ -53,20 +53,17 @@ async def buscarCampanha(ctx, nomeCampanha):
 async def iniciar(ctx, nomeCampanha):
     campanha = api_client.buscarCampanhaPorNome(nomeCampanha)
     campanha_str = json.dumps(campanha, ensure_ascii=False, indent=2)
+    chat = client.chats.create(model="gemini-2.0-flash")
     canalDaCampanhaAtiva[ctx.channel.id] = {
         "dadosCampanha": campanha,
         "ativa": True,
         "nome": nomeCampanha,
-        "historico": []
+        "historico": [],
+        "chat": chat
     }
-    prompt=f'''os jogadores iniciaram a campanha {nomeCampanha}, retome ela a partir do ultimo ponto de partida ou caso ela esteja vazia, inicie a campanha
-    para identificar se a campanha está vazia, veja se o campo contextoNarrativoAtual, nos dados que você recebeu, está vazio. Se sim, a campanha ainda não iniciou. Se já estiver algo dentro
-    do campo, a campanha já inicou. Com base nisso, seja bem descritivo e criativo para as duas situações, forneça uma introdução muito bem descritiva e interessante, ou uma continuação coerente
-    com o que já aconteceu'''
-    prompt_content = [instrucoes,
-                      campanha_str, 
-                      prompt]
-    response = chat.send_message(prompt_content)
+    prompt = f"A partir dos dados enviados, inicie a campanha {nomeCampanha}"
+    mensagem_formatada = f"{instrucoes}\n\n### DADOS DA CAMPANHA:\n{campanha_str}\n\n### AÇÃO:\n{prompt}"
+    response = chat.send_message(mensagem_formatada)
     for part in split_message(response.text):
         await ctx.send(part)
 
@@ -86,27 +83,64 @@ async def on_message(message):
         historico = canalDaCampanhaAtiva[canal]["historico"]
         historico.append({"usuario": message.author.name, "mensagem": message.content})
 
-    response = gerarResposta(message.content)
+    response = gerarResposta(message.content, message.channel.id)
 
     
     for part in split_message(response):
         await message.channel.send(part)
 
-    await bot.process_commands(message)
+
+@bot.command()
+async def criarPersonagem(ctx, *, descricao_completa:str):
+    partes = descricao_completa.rsplit(',', 1)
+    if len(partes) == 2:
+        descricao = partes[0]
+        try:
+            campanhaId_str = partes[1].strip()
+            campanhaId = int(campanhaId_str)
+        except ValueError:
+            await ctx.send("Formato inválido para o ID da campanha. Use: `!criarPersonagem <descrição>, <ID_campanha>`")
+            return
+    else:
+        await ctx.send("Formato inválido. Use: `!criarPersonagem <descrição>, <ID_campanha>`")
+        return
+    print(descricao, campanhaId)
+    personagem = geradorPersonagem.criarPersonagem(descricao)
+    api_response = api_client.criarPersonagem(personagem, campanhaId)
+    if hasattr(api_response, 'json') and callable(api_response.json):
+        personagem_json = api_response.json()
+    else:
+        personagem_json = api_response
+    response_str = json.dumps(personagem_json, indent=4, ensure_ascii=False)
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[response_str, "retorne esse JSON de uma maneira lúdica para o usuário, seja sucinto e simples"]
+    )
+    for part in split_message(response.text):
+        await ctx.send(part)    
+
+
+
+
 
 
 @bot.command()
 async def encerrar(ctx):
     canal_id = ctx.channel.id
+    chat = canalDaCampanhaAtiva[canal_id]["chat"]
     if canal_id in canalDaCampanhaAtiva:
+        resumo = chat.send_message("iremos encerrar a sessão por aqui, por favor, faça um resumo dessa sessão com o máximo de detalhes possíveis")
+        api_client.atualizarCampanha(resumo.text)
         del canalDaCampanhaAtiva[canal_id]
-        await ctx.send("⛔ Campanha encerrada.")
+        await ctx.send("⛔ Sessão encerrada.")
+        chat.delete()
     else:
-        await ctx.send("❌ Nenhuma campanha ativa neste canal.")
+        await ctx.send("❌ Nenhuma sessão ativa neste canal.")
 
 
 
-def gerarResposta(acao):
+def gerarResposta(acao, id_canal):
+    chat = canalDaCampanhaAtiva[id_canal]["chat"]
     pergunta = interpretador.fazer_pergunta(acao)
     resposta = data_splitter.gerarResposta(pergunta)
     conteudos = [resposta, acao]

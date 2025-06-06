@@ -87,3 +87,11 @@ def gerarResposta(pergunta):
     return resposta.text
 
 
+
+
+def fazer_busca(pergunta):
+    respostaRetriever = retriever.invoke(pergunta)
+    return respostaRetriever
+
+
+
