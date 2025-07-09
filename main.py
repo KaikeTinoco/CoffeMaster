@@ -75,7 +75,7 @@ async def iniciar(ctx, nomeCampanha):
 async def on_message(message):
     if message.author.bot:
         return
-    if message.content.startswith('!'):
+    if message.content.strip().startswith("!"):
         await bot.process_commands(message)
         return
     
@@ -217,10 +217,9 @@ def gerarResposta(acao, id_canal):
     dados = data_splitter.fazer_busca(pergunta)
     dados_text = "\n\n".join([doc.page_content for doc in dados])
     resposta = geradorHistoria.mestrar(acao, chat, dados_text)
-    resposta_principal = processarJSonRespostaMestre(resposta)
+    resposta_principal = processarJSonRespostaMestre(geradorHistoria.extrair_json_de_markdown(resposta))
     respostaFinal = chat.send_message(resposta_principal)
     return respostaFinal.text
-
 
 
 
