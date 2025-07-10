@@ -173,7 +173,9 @@ async def perguntar(ctx, *, pergunta):
         chat = canalDaCampanhaAtiva[channel_id]["chat"]
         conteudos = [dados_str, pergunta]
         resposta = chat.send_message(conteudos)
-        for part in split_message(resposta.text):
+        resposta = geradorHistoria.extrair_json_de_markdown(resposta.text)
+        resposta_str = json.dumps(resposta, indent=4, ensure_ascii=False)
+        for part in split_message(resposta_str):
             await ctx.send(part)
     else:
         response = client.models.generate_content(
@@ -182,7 +184,9 @@ async def perguntar(ctx, *, pergunta):
                       pergunta, 
                       "Você é um mestre de DnD 5e. Responda a pergunta do usuário com base nos dados e em seu conhecimento"]
         )
-        for part in split_message(response.text):
+        response = geradorHistoria.extrair_json_de_markdown(response.text)
+        response_str = json.dumps(response, indent=4, ensure_ascii=False)
+        for part in split_message(response_str):
             await ctx.send(part)
 
 
@@ -217,8 +221,9 @@ def gerarResposta(acao, id_canal):
     dados = data_splitter.fazer_busca(pergunta)
     dados_text = "\n\n".join([doc.page_content for doc in dados])
     resposta = geradorHistoria.mestrar(acao, chat, dados_text)
-    resposta_principal = processarJSonRespostaMestre(geradorHistoria.extrair_json_de_markdown(resposta))
+    resposta_principal = processarJSonRespostaMestre(geradorHistoria.extrair_json_de_markdown(resposta), canalDaCampanhaAtiva[id_canal]["dadosCampanha"]["id"] )
     respostaFinal = chat.send_message(resposta_principal)
+    print(geradorHistoria.extrair_json_de_markdown(respostaFinal.text))
     return respostaFinal.text
 
 
@@ -227,7 +232,7 @@ def split_message(text, limit=2000):
     return [text[i:i+limit] for i in range(0, len(text), limit)]
 
 
-def processarJSonRespostaMestre(json_data):
+def processarJSonRespostaMestre(json_data, campanhaId = None):
     if isinstance(json_data, str):
         try:
             data = json.loads(json_data)
@@ -251,14 +256,14 @@ def processarJSonRespostaMestre(json_data):
     
     if(len(descricoes_npcs) > 0):
         for descricao in descricoes_npcs:
-            criarNpc(descricao)
+            criarNpc(descricao, campanhaId)
 
     return resposta_principal
 
 
-def criarNpc(descricao):
+def criarNpc(descricao, campanhaId):
     personagem = geradorPersonagem.criarPersonagem(descricao)
-    response = api_client.criarPersonagem(personagem)
+    response = api_client.criarPersonagem(personagem, campanhaId)
     print(f"Personagem criado: {response}")
 
     
