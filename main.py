@@ -222,9 +222,7 @@ def gerarResposta(acao, id_canal):
     dados_text = "\n\n".join([doc.page_content for doc in dados])
     resposta = geradorHistoria.mestrar(acao, chat, dados_text)
     resposta_principal = processarJSonRespostaMestre(geradorHistoria.extrair_json_de_markdown(resposta), canalDaCampanhaAtiva[id_canal]["dadosCampanha"]["id"] )
-    respostaFinal = chat.send_message(resposta_principal)
-    return respostaFinal.text
-
+    return resposta_principal
 
 
 def split_message(text, limit=2000):
