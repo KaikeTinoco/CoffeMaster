@@ -223,7 +223,6 @@ def gerarResposta(acao, id_canal):
     resposta = geradorHistoria.mestrar(acao, chat, dados_text)
     resposta_principal = processarJSonRespostaMestre(geradorHistoria.extrair_json_de_markdown(resposta), canalDaCampanhaAtiva[id_canal]["dadosCampanha"]["id"] )
     respostaFinal = chat.send_message(resposta_principal)
-    print(geradorHistoria.extrair_json_de_markdown(respostaFinal.text))
     return respostaFinal.text
 
 
@@ -262,7 +261,7 @@ def processarJSonRespostaMestre(json_data, campanhaId = None):
 
 
 def criarNpc(descricao, campanhaId):
-    personagem = geradorPersonagem.criarPersonagem(descricao)
+    personagem = geradorPersonagem.criarNpc(descricao)
     response = api_client.criarPersonagem(personagem, campanhaId)
     print(f"Personagem criado: {response}")
 
